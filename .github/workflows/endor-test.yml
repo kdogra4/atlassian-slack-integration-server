@@ -1,0 +1,47 @@
+on:
+  workflow_dispatch: {}
+name: Endor Labs
+jobs:
+  endor:
+    strategy:
+      matrix:
+        java-version: [21]
+        jira-version: [10.0.0]
+    permissions:
+      contents: read
+      id-token: write
+    #runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: adopt
+      - run: bin/build/install-plugin-sdk.sh
+      - run: bin/build/override-plugin-sdk-maven.sh
+      - run: bin/build/install-int-test-libs.sh
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-unit
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/com/atlassian/jira
+          key: maven-integration-jira-${{ matrix.jira-version }}
+      - run: bin/build/install-common-modules.sh
+
+      - run: |
+          export MAVEN_HOME=$(atlas-version | grep 'ATLAS Maven Home' | grep -oE '/.+$')
+          export PATH=${MAVEN_HOME}:${PATH}
+          atlas-version
+
+      - name: Scan with Endor Labs
+        uses: endorlabs/github-action@v1.1.7
+        with:
+          namespace: kriti-learn
+          scan_summary_output_type: 'json'
+          pr: false
+          scan_secrets: false
+          scan_dependencies: true
